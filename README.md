@@ -1,5 +1,6 @@
 # COMP9417_Project
-Traditional algorithm vs Deep learning
-# 1. Popular algorithm: CART(Classification And Regression Tree) and CNN
-# 2. Random Forest and ResNet
-# 3. Navi Bayes and VGG
+No. | Traditional algorithm | Deep learning | Name
+| :----- | :----- | :----- | :-----
+1|CART(Classification And Regression Tree) | CNN | XXXX
+2|Random Forest | VGG | XXXX
+3|Navi Bayes | ResNet | XXXX
