@@ -74,6 +74,10 @@ def train_model():
         valid_loss = validate(model, validDataloader, device, bert_model)
         print(f'Epoch {epoch + 1}, Train Loss: {train_loss}, Valid Loss: {valid_loss}')
 
-        if epoch % 2 == 0:
+        if epoch % 2 == 1:
             print('saving checkpoint at epoch {}'.format(epoch + 1))
             torch.save(model.state_dict(), r"checkModel.pth")
+
+
+if __name__ == '__main__':
+    train_model()
