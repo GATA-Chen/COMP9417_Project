@@ -3,3 +3,4 @@ venv
 .DS_Store
 ref
 checkModel.pth
+__pycache__
