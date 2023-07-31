@@ -1,20 +1,21 @@
-import json
-import os
+import torch
 import warnings
-from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-from transformers import BertTokenizer
+from transformers import GPT2Tokenizer
+from datasets import load_dataset
+from config import *
+
 
 warnings.filterwarnings('ignore')
 
 
 class ImageDataset(Dataset):
-    def __init__(self, data_dirs, mode=0):
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        self.tokenizer.eos_token = self.tokenizer.sep_token
+    def __init__(self, mode=0):
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.data_dirs = data_dirs
+        self.data_set = TRAIN_DATA_SET if mode == 0 else VALID_DATA_SET
+        self.dataset = load_dataset(DATA_PATH, self.data_set)['train']
         self.transform = [
             transforms.Compose([transforms.RandomRotation(30),
                                 transforms.RandomResizedCrop(224),
@@ -29,37 +30,19 @@ class ImageDataset(Dataset):
                                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                                 ])
         ][mode]
-        self.image_files = []
-        self.json_data = {}
-        for i in data_dirs:
-            image_files_dir = [os.path.join(i, f) for f in os.listdir(i) if f.endswith('.webp')]
-            self.image_files.extend(image_files_dir)
-            json_file = [f for f in os.listdir(i) if f.endswith('.json')]
-            json_file = json_file[0]
-            with open(os.path.join(i, json_file)) as f:
-                json_data = json.load(f)
-            for key in json_data.keys():
-                self.json_data[key] = json_data[key]['p']
 
     def __len__(self):
-        return len(self.image_files)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        img_path = self.image_files[idx]
-        img_name = os.path.basename(img_path)
-        image = Image.open(img_path).convert('RGB')
-        image = self.transform(image)
+        image = self.transform(self.dataset[idx]['image'])
 
-        prompt = self.json_data[img_name]
-        prompt = self.tokenizer(prompt, return_tensors='pt', padding='max_length', max_length=512, truncation=True)
-        input_ids = prompt['input_ids']
-        attention_mask = prompt['attention_mask'].squeeze()
-        return image, input_ids, attention_mask
+        prompt = self.dataset[idx]['prompt']
+        prompt = self.tokenizer.encode_plus(prompt, return_tensors='pt', padding='max_length', max_length=512,
+                                            truncation=True)
+        return image, prompt['input_ids'], torch.tensor(prompt['attention_mask'])
 
 
-def get_dataloader(data_location, batch_size):
-    data_set = sorted([i for i in [os.path.join(data_location, item) for item in os.listdir(data_location)]
-                       if os.path.isdir(i)])
-    train_number = int(len(data_set) * 0.8)
-    return [DataLoader(ImageDataset(data_set[0:train_number], mode=0), batch_size=batch_size, shuffle=True),
-            DataLoader(ImageDataset(data_set[train_number:], mode=1), batch_size=batch_size, shuffle=True)]
+def get_dataloader():
+    return [DataLoader(ImageDataset(0), batch_size=BATCH_SIZE, shuffle=True),
+            DataLoader(ImageDataset(1), batch_size=BATCH_SIZE, shuffle=True)]
