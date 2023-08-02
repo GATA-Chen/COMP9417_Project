@@ -20,8 +20,10 @@ class ImageDataset(Dataset):
         self.image_names = []
         self.preprocess = preprocess
         for file in glob.glob(join(path, '*')):
-            image = PIL.Image.open(file).convert('RGB')
             filename = os.path.basename(file)
+            if 'webp' not in filename:
+                continue
+            image = PIL.Image.open(file).convert('RGB')
 
             self.images.append(image)
             self.image_names.append(filename)
@@ -37,10 +39,11 @@ class ImageDataset(Dataset):
 
 def load_model(model_path):
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    tokenizer.pad_token_id = 0
     resnet_model = resnet50(pretrained=True)
     gpt2_model = GPT2LMHeadModel.from_pretrained('gpt2')
     model = Resnet_LSTM(resnet_model, gpt2_model, 1024)
-    model.load_state_dict(torch.load(model_path, map_location='mps'))
+    model.load_state_dict(torch.load(model_path))
     model.to(device)
 
     return model
@@ -54,7 +57,7 @@ def generate_and_save_predictions(model, dataloader, output_file):
         with torch.no_grad():
             for images, image_names in tqdm(dataloader):
                 images = images.to(device)
-                attention_mask = torch.ones(images.size(0), 512).to(device)
+                attention_mask = torch.ones(images.size(0), 128).to(device)
                 output = model(images, attention_mask)
                 predicted_ids = output.argmax(dim=-1)
                 for i in range(predicted_ids.size(0)):

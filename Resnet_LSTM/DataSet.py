@@ -13,7 +13,7 @@ warnings.filterwarnings('ignore')
 class ImageDataset(Dataset):
     def __init__(self, mode=0):
         self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer.pad_token_id = 0
         self.data_set = TRAIN_DATA_SET if mode == 0 else VALID_DATA_SET
         self.dataset = load_dataset(DATA_PATH, self.data_set)['train']
         self.transform = [
@@ -38,8 +38,8 @@ class ImageDataset(Dataset):
         image = self.transform(self.dataset[idx]['image'])
 
         prompt = self.dataset[idx]['prompt']
-        prompt = self.tokenizer.encode_plus(prompt, return_tensors='pt', padding='max_length', max_length=512,
-                                            truncation=True)
+        prompt = self.tokenizer.encode_plus(prompt, add_special_tokens=True, max_length=512, padding='max_length',
+                                            return_attention_mask=True, return_tensors='pt')
         return image, prompt['input_ids'], torch.tensor(prompt['attention_mask'])
 
 

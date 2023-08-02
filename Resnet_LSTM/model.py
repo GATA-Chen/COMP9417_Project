@@ -37,7 +37,8 @@ def train(model, dataloader, optimizer, device, gpt2_model, scheduler):
         attention_mask = attention_mask.to(device)
         optimizer.zero_grad()
         output = model(images, attention_mask)
-        loss = nn.CrossEntropyLoss()(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1))
+        loss = nn.CrossEntropyLoss()(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1),
+                                     ignore_index=0)
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -54,7 +55,8 @@ def validate(model, dataloader, device, gpt2_model):
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
             output = model(images, attention_mask)
-            loss = nn.CrossEntropyLoss()(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1))
+            loss = nn.CrossEntropyLoss()(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1),
+                                         ignore_index=0)
             total_loss += loss.item()
     return total_loss / len(dataloader)
 
