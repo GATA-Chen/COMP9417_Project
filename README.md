@@ -10,5 +10,5 @@
 # COMP9417_Project
 No. | Deep learning | Name
 | :----- | :----- | :----- 
-1 | ResNet+LSTM | xxxx
+1 | ResNet+LSTM | Jinghan Wang
 2 | CLIP+GPT2 | Shengyu Chen
