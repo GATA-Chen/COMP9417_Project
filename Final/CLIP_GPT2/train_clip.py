@@ -3,7 +3,7 @@ import clip
 import os
 import json
 import torch
-from torch import nn
+from datasets import load_dataset
 import torch.nn.functional as F
 import transformers
 from tqdm import tqdm
@@ -65,8 +65,6 @@ class makeDataset(Dataset):
         # Load the GPT2 tokenizer
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         self.embed_list = list()
-        # data_path = r"DataSet"
-        path = r'/kaggle/working/encoder_for_train_5k.pkl'
 
         # Check if the data has already been processed and saved in a file，If not, process the data and save to a file
         if os.path.isfile(f2):
@@ -83,7 +81,7 @@ class makeDataset(Dataset):
                 with open(filename, 'rb') as f:
                     prompts, idx2embd = pickle.load(f)
             else:
-                prompts, idx2embd = image_encoder(datasets, "train")
+                prompts, idx2embd = image_encoder(datasets, "train", f2)
 
             # Loop over the prompts and encode them using the GPT2 tokenizer
             with tqdm(range(len(prompts)), desc='Embedding prompts') as pbar:
@@ -311,7 +309,7 @@ class ClipCaptionModel(nn.Module):
         return self
 
 
-def main(filename, f2, f3):
+def main(filename, f2, f3, d):
     # Clear the GPU memory
     torch.cuda.empty_cache()
 
@@ -319,7 +317,7 @@ def main(filename, f2, f3):
     model = ClipCaptionModel(p.prefix_len, p.img_size, p.tune).to(device)
 
     # Instantiate the dataset
-    dataset = makeDataset(p.prefix_len, p.isNormalize, None, filename, f2)
+    dataset = makeDataset(p.prefix_len, p.isNormalize, d, filename, f2)
 
     # Split the dataset into training and validation sets
     test_size = int(p.test_split * len(dataset))
@@ -348,10 +346,10 @@ p = {
     "img_size": 512,
     "tune": True,
     "isNormalize": True,
-    "batch_size": 32,
+    "batch_size": 40,
     "test_split": 0.2,
     "epochs": 40,
-    "lr": 2e-5
+    "lr": 1e-4
 }
 
 
@@ -369,5 +367,6 @@ class DotDict(dict):
 p = DotDict(p)
 
 torch.cuda.empty_cache()
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-main(r'/kaggle/input/models/train_for_dataset_10k.pkl', r'/kaggle/working/encoder_for_train_10k.pkl', r'loss_10k.txt')
+device = torch.device('cpu')
+dataset = load_dataset("poloclub/diffusiondb", '2m_first_1k')
+main(r'models/train_for_dataset_1k.pkl', r'encoder_for_train_1k.pkl', r'loss_1k.txt', dataset)
