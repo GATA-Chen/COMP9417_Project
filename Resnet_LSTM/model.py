@@ -5,10 +5,58 @@ from tqdm import tqdm
 from torch import nn
 from torchvision import models
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
-from config import *
-from DataSet import get_dataloader
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+from datasets import load_dataset
 
 warnings.filterwarnings('ignore')
+
+EPOCH = 16
+BATCH_SIZE = 20
+DATA_PATH = 'poloclub/diffusiondb'
+TRAIN_DATA_SET = '2m_first_1k'
+VALID_DATA_SET = '2m_first_1k'
+EMBEDDING_DIM = 1024
+MAX_LENGTH = 200
+
+
+class ImageDataset(Dataset):
+    def __init__(self, mode=0):
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.tokenizer.pad_token_id = 0
+        self.data_set = TRAIN_DATA_SET if mode == 0 else VALID_DATA_SET
+        self.dataset = load_dataset(DATA_PATH, self.data_set)['train']
+        self.transform = [
+            transforms.Compose([transforms.RandomRotation(30),
+                                transforms.RandomResizedCrop(224),
+                                transforms.RandomHorizontalFlip(p=0.5),
+                                transforms.RandomVerticalFlip(p=0.5),
+                                transforms.ColorJitter(brightness=0.2, contrast=0.1, saturation=0.1, hue=0.1),
+                                transforms.ToTensor(),
+                                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                                ]),
+            transforms.Compose([transforms.CenterCrop(224),
+                                transforms.ToTensor(),
+                                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                                ])
+        ][mode]
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        image = self.transform(self.dataset[idx]['image'])
+
+        prompt = self.dataset[idx]['prompt']
+        prompt = self.tokenizer.encode_plus(prompt, add_special_tokens=True, max_length=MAX_LENGTH,
+                                            padding='max_length',
+                                            return_attention_mask=True, return_tensors='pt')
+        return image, prompt['input_ids'], torch.tensor(prompt['attention_mask'])
+
+
+def get_dataloader():
+    return [DataLoader(ImageDataset(0), batch_size=BATCH_SIZE, shuffle=True),
+            DataLoader(ImageDataset(1), batch_size=BATCH_SIZE, shuffle=True)]
 
 
 class Resnet_LSTM(nn.Module):
@@ -54,7 +102,8 @@ def validate(model, dataloader, device, gpt2_model):
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
             output = model(images, attention_mask)
-            loss = nn.CrossEntropyLoss(ignore_index=0)(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1))
+            loss = nn.CrossEntropyLoss(ignore_index=0)(output.view(-1, gpt2_model.config.vocab_size),
+                                                       input_ids.view(-1))
             total_loss += loss.item()
     return total_loss / len(dataloader)
 
@@ -79,8 +128,9 @@ def train_model():
         valid_loss = validate(model, valid_dataloader, device, gpt2_model)
         print(f'Epoch {epoch + 1}, Train Loss: {train_loss}, Valid Loss: {valid_loss}')
 
-        print('Saving checkpoint at epoch {}'.format(epoch + 1))
-        torch.save(model.state_dict(), "checkModel.pth")
+        if (epoch + 1) % 5 == 0:
+            print('Saving checkpoint at epoch {}'.format(epoch + 1))
+            torch.save(model.state_dict(), "checkModel.pth")
 
 
 if __name__ == '__main__':
