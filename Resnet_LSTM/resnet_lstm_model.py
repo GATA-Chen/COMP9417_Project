@@ -23,7 +23,7 @@ class Resnet_LSTM(nn.Module):
         resnet_output = self.resnet(images)
         resnet_output = self.fc(resnet_output)
         lstm_output, _ = self.lstm(resnet_output.unsqueeze(1))
-        lstm_output = lstm_output.expand(-1, 512, -1)
+        lstm_output = lstm_output.expand(-1, MAX_LENGTH, -1)
         gpt2_output = self.gpt2(inputs_embeds=lstm_output, attention_mask=attention_mask)
         return gpt2_output.logits
 
@@ -37,8 +37,7 @@ def train(model, dataloader, optimizer, device, gpt2_model, scheduler):
         attention_mask = attention_mask.to(device)
         optimizer.zero_grad()
         output = model(images, attention_mask)
-        loss = nn.CrossEntropyLoss()(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1),
-                                     ignore_index=0)
+        loss = nn.CrossEntropyLoss(ignore_index=0)(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1))
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -55,8 +54,7 @@ def validate(model, dataloader, device, gpt2_model):
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
             output = model(images, attention_mask)
-            loss = nn.CrossEntropyLoss()(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1),
-                                         ignore_index=0)
+            loss = nn.CrossEntropyLoss(ignore_index=0)(output.view(-1, gpt2_model.config.vocab_size), input_ids.view(-1))
             total_loss += loss.item()
     return total_loss / len(dataloader)
 
@@ -73,7 +71,7 @@ def train_model():
     model = Resnet_LSTM(resnet_model, gpt2_model, EMBEDDING_DIM).to(device)
     optimizer = torch.optim.Adam(model.parameters())
     scheduler = transformers.get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps = 8000, num_training_steps = len(train_dataloader) * EPOCH
+        optimizer, num_warmup_steps=8000, num_training_steps=len(train_dataloader) * EPOCH
     )
 
     for epoch in range(EPOCH):
